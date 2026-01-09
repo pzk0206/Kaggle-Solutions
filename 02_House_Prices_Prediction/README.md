@@ -1,7 +1,7 @@
 # House Prices Prediction: Advanced Regression with XGBoost 🏠
 
 > **Kaggle 竞赛:** [House Prices: Advanced Regression Techniques](https://www.kaggle.com/c/house-prices-advanced-regression-techniques)
-> **最终排名:** Top 15% (预估)
+> **公开榜得分:** 0.12642 🚀
 > **核心模型:** XGBoost Regressor
 > **关键策略:** Target Log 对数变换 + 分层缺失值填充
 
