@@ -1,9 +1,9 @@
 # House Prices Prediction: Advanced Regression with XGBoost 🏠
 
-> **Kaggle Competition:** [House Prices: Advanced Regression Techniques](https://www.kaggle.com/c/house-prices-advanced-regression-techniques)
-> **Score:** Top 15% (Estimated)
-> **Model:** XGBoost Regressor
-> **Strategy:** Log-Transformation + Stratified Imputation
+> **Kaggle 竞赛:** [House Prices: Advanced Regression Techniques](https://www.kaggle.com/c/house-prices-advanced-regression-techniques)
+> **最终排名:** Top 15% (预估)
+> **核心模型:** XGBoost Regressor
+> **关键策略:** Target Log 对数变换 + 分层缺失值填充
 
 ## 1. Project Overview (项目简介)
 本项目基于 Kaggle 经典的结构化数据竞赛。任务是根据爱荷华州埃姆斯市住宅的 79 个特征（如地基、车库、地下室等），预测房屋的最终售价。
