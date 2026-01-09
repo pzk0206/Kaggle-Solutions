@@ -32,6 +32,10 @@ train_df.drop("Id", axis=1, inplace=True)
 test_df.drop("Id", axis=1, inplace=True)
 
 print("✅ 数据读取完成！")
+
+Step 2: 目标值处理 <a name="step-2"></a>
+原始房价呈现右偏分布（大部分是普通价格，极少数是豪宅），这不利于模型学习。我们使用 log1p 对其进行平滑处理。
+
 # Log 平滑变换
 train_df["SalePrice"] = np.log1p(train_df["SalePrice"])
 print("✅ 目标值已完成 Log 变换")
