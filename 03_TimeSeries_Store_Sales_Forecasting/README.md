@@ -51,3 +51,15 @@ val_mask = train['date'] >= '2017-01-01'
 
 X_train = train.loc[train_mask, features]
 X_val = train.loc[val_mask, features]
+```python
+# 3.1 结尾的代码
+X_train = train.loc[train_mask, features]
+X_val = train.loc[val_mask, features]
+# 3.2 的代码：精准假期匹配逻辑
+def apply_local_holidays(df, local_hols, merge_col):
+    # 将假期表与主表进行左连接
+    merged = df.merge(local_hols[['date', 'locale_name']], 
+                      left_on=['date', merge_col], 
+                      right_on=['date', 'locale_name'], 
+                      how='left')
+    # ... (后续代码)
