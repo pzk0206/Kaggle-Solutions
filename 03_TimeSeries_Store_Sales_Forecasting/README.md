@@ -1,59 +1,76 @@
-# 📈 Store Sales - Time Series Forecasting (Top 20% 实战解析)
+# Store Sales Prediction: Industrial Time Series Forecasting with XGBoost 📈
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![XGBoost](https://img.shields.io/badge/Model-XGBoost-orange)
-![Score](https://img.shields.io/badge/Public_LB-0.46139-brightgreen)
-![Status](https://img.shields.io/badge/Status-Completed-success)
+> **Kaggle 竞赛:** [Store Sales - Time Series Forecasting](https://www.kaggle.com/competitions/store-sales-time-series-forecasting)
+> **公开榜得分:** 0.46139 (Top 20%) 🚀
+> **核心模型:** XGBoost Regressor (GPU Accelerated)
+> **关键策略:** Lag Features (滞后特征) + Rolling Windows (滑动窗口) + Time-Based Split
 
-## 1. 项目背景 (Overview)
+## 1. Project Overview (项目简介)
+本项目基于 Kaggle 经典的时间序列竞赛。任务是预测厄瓜多尔大型零售商 Corporación Favorita 旗下 **54 家商店**、**33 类商品**在未来 **16 天**的日销量。
 
-本项目是 Kaggle 经典时间序列竞赛 [Store Sales - Time Series Forecasting](https://www.kaggle.com/competitions/store-sales-time-series-forecasting) 的完整解决方案。
+* **难点 (Challenges)：**
+    * **多变量干扰：** 销量受油价波动（宏观经济）、节假日（局部事件）、发薪日等多重因素影响。
+    * **数据量大：** 训练集包含超过 300 万行数据。
+    * **未来泄露风险：** 测试集要求预测未来 16 天，必须防止在特征工程中“看见未来”。
+* **我的方案 (My Approach)：**
+    * **目标变换：** 使用 **Log1p** 处理长尾分布的销量数据。
+    * **环境感知：** 构建精准的**假期匹配逻辑**（城市对城市）和油价插值。
+    * **时序魔法：** 放弃简单的日期特征，转而构建 **Lag 16+** (滞后特征) 和 **Rolling Mean** (趋势特征)，这是提分的关键。
 
-* **业务场景：** 预测厄瓜多尔大型零售商 Favorita 旗下 54 家商店在未来 16 天的日销量。
-* **难点：** 数据受多种外部因素影响（油价波动、地方性假期、发薪日效应），且不同商店、不同品类的销售模式差异巨大。
-* **最终成绩：** RMSLE **0.46139** (Top 20%)。
-
----
-
-## 2. 核心策略与演进 (Strategy)
-
-我不追求盲目的模型堆叠，而是采用**工业级特征工程**的思路，通过“理解数据”来提升分数。
-
-| 阶段 | 方法 | 验证集分数 (RMSLE) | 提升逻辑 |
-| :--- | :--- | :--- | :--- |
-| **Baseline** | 线性回归 (仅日期特征) | 2.19 | 模型欠拟合，无法捕捉非线性关系。 |
-| **V2** | XGBoost + 宏观数据 | 0.69 | 引入油价和商店位置，确立了基础树模型框架。 |
-| **V3** | 精细化假期匹配 | 0.68 | 修正了“所有假期都影响所有商店”的错误逻辑。 |
-| **V5** | **滞后特征 (Lag Features)** | **0.5064** | **质变点：** 教会模型理解“近期趋势”和“历史惯性”。 |
+## 2. Tech Stack (技术栈)
+* **Python 3.8+**
+* **Pandas & NumPy** (High-performance Data Manipulation)
+* **XGBoost** (Gradient Boosting with `tree_method='hist'`)
+* **Scikit-Learn** (Label Encoding, Metrics)
+* **Matplotlib** (Visualization)
 
 ---
 
-## 3. 技术深度解析 (Technical Deep Dive)
+## 3. Implementation Details (核心实现)
 
-以下是本项目最核心的四个技术环节，包含**代码实现**与**设计原理**。
+### 3.1 Data Preprocessing & Context Engineering (数据预处理与环境感知)
 
-### 3.1 验证集切分策略 (Time-Based Split)
+为了构建高质量的训练数据，我执行了三个关键步骤：
+1.  **目标变换：** 对长尾分布的 `sales` 进行 **Log1p** 变换，使其符合 RMSLE 评估指标。
+2.  **环境感知 (Context)：** 编写**精准假期匹配逻辑**。单纯的 Merge 会引入噪音（例如“基多”的商店不应受“昆卡”地方假期的影响），只有当 `Store City == Holiday Locale` 时才标记为假期。
+3.  **时间切分 (Split)：** 严禁随机切分，严格按照时间轴划分训练集 (`2013-2016`) 和验证集 (`2017`)。
 
-在时间序列中，随机切分（Random Split）是严重的错误，因为它会导致**未来数据泄露 (Data Leakage)**。我严格按照时间轴进行切分。
-
-* **训练集：** 2013-01-01 至 2016-12-31
-* **验证集：** 2017-01-01 至 2017-08-15
-* **测试集：** 2017-08-16 至 2017-08-31
+![Target Distribution](images/target_dist.png)
 
 ```python
-# 数据切分逻辑
-# log1p: 对销量做 Log 变换，使分布更接近正态，且符合 RMSLE 评估指标
-y = np.log1p(train['sales'])
+import pandas as pd
+import numpy as np
+import xgboost as xgb
 
-# 严格按日期切分
+# 1. 目标值 Log 平滑 (Target Log Transformation)
+train['sales'] = np.log1p(train['sales'])
+
+# 2. 假期特征精准匹配 (Precise Holiday Matching)
+# 策略：只有当 商店所在城市 == 假期庆祝城市 时，才标记为假期
+def apply_local_holidays(df, local_hols, merge_col):
+    merged = df.merge(local_hols[['date', 'locale_name']], 
+                      left_on=['date', merge_col], 
+                      right_on=['date', 'locale_name'], 
+                      how='left')
+    is_local_hol = merged['locale_name'].notna()
+    # 这是一个累加过程，保留已有的假期标记
+    return np.maximum(df.get('is_holiday', 0), is_local_hol.astype(int))
+
+# 初始化并应用逻辑
+train['is_holiday'] = 0
+train['is_holiday'] = apply_local_holidays(train, local_holidays, 'city')
+train['is_holiday'] = apply_local_holidays(train, regional_holidays, 'state')
+
+print("✅ 假期特征清洗完成 (Noise Reduction Applied)")
+
+# 3. 基于时间的严格切分 (Time-Based Split)
+# 训练集: 2013 ~ 2016 | 验证集: 2017-01-01 ~ 2017-08-15
 train_mask = train['date'] < '2017-01-01'
 val_mask = train['date'] >= '2017-01-01'
 
 X_train = train.loc[train_mask, features]
+y_train = train.loc[train_mask, 'sales']
 X_val = train.loc[val_mask, features]
+y_val = train.loc[val_mask, 'sales']
 
-### 3.2 宏观与事件特征清洗 (Context Features)
-
-简单的 merge 会引入噪音。例如，一个只在“昆卡(Cuenca)”庆祝的地方假期，不应该影响“基多(Quito)”的商店销量。
-
-解决方案： 编写精准匹配逻辑，只有当 Store City == Holiday Locale 时才标记为假期。
+print(f"✅ 数据准备完成。训练集样本数: {X_train.shape[0]}")
