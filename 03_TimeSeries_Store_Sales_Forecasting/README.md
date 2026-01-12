@@ -51,6 +51,10 @@ val_mask = train['date'] >= '2017-01-01'
 
 X_train = train.loc[train_mask, features]
 X_val = train.loc[val_mask, features]
+3.2 宏观与事件特征清洗 (Context Features)
+简单的 merge 会引入噪音。例如，一个只在“昆卡(Cuenca)”庆祝的地方假期，不应该影响“基多(Quito)”的商店销量。
+
+解决方案： 编写精准匹配逻辑，只有当 Store City == Holiday Locale 时才标记为假期。
 # 精准假期匹配逻辑
 def apply_local_holidays(df, local_hols, merge_col):
     # 将假期表与主表进行左连接
