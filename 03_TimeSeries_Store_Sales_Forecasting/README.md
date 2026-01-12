@@ -51,3 +51,16 @@ val_mask = train['date'] >= '2017-01-01'
 
 X_train = train.loc[train_mask, features]
 X_val = train.loc[val_mask, features]
+# 精准假期匹配逻辑
+def apply_local_holidays(df, local_hols, merge_col):
+    # 将假期表与主表进行左连接
+    merged = df.merge(local_hols[['date', 'locale_name']], 
+                      left_on=['date', merge_col], 
+                      right_on=['date', 'locale_name'], 
+                      how='left')
+    # 如果匹配到了(notna)，则标记为1，否则保留原值
+    is_local_hol = merged['locale_name'].notna()
+    return np.maximum(df['is_holiday'], is_local_hol.astype(int))
+
+# 分别处理地方(City)和区域(State)假期
+train['is_holiday'] = apply_local_holidays(train, local_holidays, 'city')
