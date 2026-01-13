@@ -98,3 +98,4 @@ all_data['rolling_mean_30'] = all_data.groupby(['store_nbr', 'family'])['sales']
     .transform(lambda x: x.shift(16).rolling(30).mean())
 
 print("✅ 高阶时序特征构建完成 (Lags + Rolling Means)")
+
