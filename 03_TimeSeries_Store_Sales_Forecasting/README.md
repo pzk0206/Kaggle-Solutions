@@ -29,11 +29,9 @@
 ## 3. Implementation Details (核心实现)
 
 ### 3.1 Data Preprocessing & Context Engineering (数据预处理与环境感知)
+为了构建高质量的训练数据，我执行了三个关键步骤：目标值 Log 变换、精准假期清洗（去除噪音）、以及严格的时间轴切分。
 
-为了构建高质量的训练数据，我执行了三个关键步骤：
-1.  **目标变换：** 对长尾分布的 `sales` 进行 **Log1p** 变换，使其符合 RMSLE 评估指标。
-2.  **环境感知 (Context)：** 编写**精准假期匹配逻辑**。单纯的 Merge 会引入噪音（例如“基多”的商店不应受“昆卡”地方假期的影响），只有当 `Store City == Holiday Locale` 时才标记为假期。
-3.  **时间切分 (Split)：** 严禁随机切分，严格按照时间轴划分训练集 (`2013-2016`) 和验证集 (`2017`)。
+![Target Distribution](images/target_dist.png)
 
 ```python
 import pandas as pd
@@ -72,16 +70,12 @@ X_val = train.loc[val_mask, features]
 y_val = train.loc[val_mask, 'sales']
 
 print(f"✅ 数据准备完成。训练集样本数: {X_train.shape[0]}")
-
-### 3.2 Temporal Feature Engineering (时序特征挖掘)
+3.2 Temporal Feature Engineering (时序特征挖掘)
 这是本项目最核心的提分点。为了预测未来 16 天，我们不能使用“昨天”的数据（Lag 1），因为在预测第 2 天时数据会缺失。
 
-* **Lag 16 Strategy:** 强制模型回看 16 天前的数据，确保推理阶段数据完整。
-* **Rolling Mean:** 使用滑动窗口平滑单日销量的随机波动（如突发天气影响）。
+Lag 16 Strategy: 强制模型回看 16 天前的数据，确保推理阶段数据完整。
 
-![Feature Engineering](images/lag_features.png)
-
-```python
+Rolling Mean: 使用滑动窗口平滑单日销量的随机波动（如突发天气影响）。
 # 必须合并 Train 和 Test 进行时序计算，并按 Store/Family 排序
 all_data = pd.concat([train, test], axis=0).sort_values(['store_nbr', 'family', 'date'])
 
@@ -98,4 +92,38 @@ all_data['rolling_mean_30'] = all_data.groupby(['store_nbr', 'family'])['sales']
     .transform(lambda x: x.shift(16).rolling(30).mean())
 
 print("✅ 高阶时序特征构建完成 (Lags + Rolling Means)")
+3.3 Model Training & Results (模型训练)
+使用 XGBoost 进行训练，开启 GPU 加速 (tree_method='hist') 以处理大规模数据。通过 Early Stopping 防止过拟合。
+特征重要性分析： 模型高度依赖 rolling_mean 和 lag 特征，证明了时序特征的有效性。
+# 构建 XGBoost 模型
+model = xgb.XGBRegressor(
+    n_estimators=5000,
+    learning_rate=0.01,       # 低学习率，精细化拟合
+    max_depth=6,              
+    subsample=0.8,
+    colsample_bytree=0.8,
+    device='cuda',            # 开启 GPU 加速
+    tree_method='hist',       
+    early_stopping_rounds=100
+)
 
+# 训练
+print("🚀 开始训练 XGBoost (GPU Mode)...")
+model.fit(
+    X_train, y_train,
+    eval_set=[(X_train, y_train), (X_val, y_val)],
+    verbose=500
+)
+
+# 结果对比
+# Baseline (Linear Regression): ~2.19
+# XGBoost (Static Features):    ~0.69
+# XGBoost (Lag Features):        0.46139 (Final)
+4. Repository Structure (文件结构)
+├── data/                   # (Optional) Data files
+├── notebooks/
+│   └── store_sales_forecasting.ipynb  # 完整的训练与推理代码
+├── submission/
+│   └── submission.csv      # 最终提交结果 (Score: 0.46)
+├── images/                 # 项目截图
+└── README.md               # 项目文档
