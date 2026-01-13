@@ -2,7 +2,7 @@
 
 > **Kaggle 竞赛:** [Store Sales - Time Series Forecasting](https://www.kaggle.com/competitions/store-sales-time-series-forecasting)
 > **公开榜得分:** 0.46139 (Top 20%) 🚀
-> **核心模型:** XGBoost Regressor    (GPU Accelerated)
+> **核心模型:** XGBoost Regressor (GPU Accelerated)
 > **关键策略:** Lag Features (滞后特征) + Rolling Windows (滑动窗口) + Time-Based Split
 
 ## 1. Project Overview (项目简介)
@@ -34,8 +34,6 @@
 1.  **目标变换：** 对长尾分布的 `sales` 进行 **Log1p** 变换，使其符合 RMSLE 评估指标。
 2.  **环境感知 (Context)：** 编写**精准假期匹配逻辑**。单纯的 Merge 会引入噪音（例如“基多”的商店不应受“昆卡”地方假期的影响），只有当 `Store City == Holiday Locale` 时才标记为假期。
 3.  **时间切分 (Split)：** 严禁随机切分，严格按照时间轴划分训练集 (`2013-2016`) 和验证集 (`2017`)。
-
-![Target Distribution](images/target_dist.png)
 
 ```python
 import pandas as pd
@@ -100,40 +98,3 @@ all_data['rolling_mean_30'] = all_data.groupby(['store_nbr', 'family'])['sales']
     .transform(lambda x: x.shift(16).rolling(30).mean())
 
 print("✅ 高阶时序特征构建完成 (Lags + Rolling Means)")
-
-3.3 Model Training & Results (模型训练)
-使用 XGBoost 进行训练，开启 GPU 加速 (tree_method='hist') 以处理大规模数据。通过 Early Stopping 防止过拟合。
-
-特征重要性分析： 模型高度依赖 rolling_mean 和 lag 特征，证明了时序特征的有效性。
-# 构建 XGBoost 模型
-model = xgb.XGBRegressor(
-    n_estimators=5000,
-    learning_rate=0.01,       # 低学习率，精细化拟合
-    max_depth=6,              
-    subsample=0.8,
-    colsample_bytree=0.8,
-    device='cuda',            # 开启 GPU 加速
-    tree_method='hist',       
-    early_stopping_rounds=100
-)
-
-# 训练
-print("🚀 开始训练 XGBoost (GPU Mode)...")
-model.fit(
-    X_train, y_train,
-    eval_set=[(X_train, y_train), (X_val, y_val)],
-    verbose=500
-)
-
-# 结果对比
-# Baseline (Linear Regression): ~2.19
-# XGBoost (Static Features):    ~0.69
-# XGBoost (Lag Features):        0.46139 (Final)
-4. Repository Structure (文件结构)
-├── data/                   # (Optional) Data files
-├── notebooks/
-│   └── store_sales_forecasting.ipynb  # 完整的训练与推理代码
-├── submission/
-│   └── submission.csv      # 最终提交结果 (Score: 0.46)
-├── images/                 # 项目截图
-└── README.md               # 项目文档
