@@ -2,7 +2,7 @@
 
 > **Kaggle 竞赛:** [Store Sales - Time Series Forecasting](https://www.kaggle.com/competitions/store-sales-time-series-forecasting)
 > **公开榜得分:** 0.46139 (Top 20%) 🚀
-> **核心模型:** XGBoost Regressor (GPU Accelerated)
+> **核心模型:** XGBoost Regressor    (GPU Accelerated)
 > **关键策略:** Lag Features (滞后特征) + Rolling Windows (滑动窗口) + Time-Based Split
 
 ## 1. Project Overview (项目简介)
