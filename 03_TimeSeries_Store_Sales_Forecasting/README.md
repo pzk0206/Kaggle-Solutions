@@ -74,3 +74,29 @@ X_val = train.loc[val_mask, features]
 y_val = train.loc[val_mask, 'sales']
 
 print(f"✅ 数据准备完成。训练集样本数: {X_train.shape[0]}")
+
+### 3.2 Temporal Feature Engineering (时序特征挖掘)
+这是本项目最核心的提分点。为了预测未来 16 天，我们不能使用“昨天”的数据（Lag 1），因为在预测第 2 天时数据会缺失。
+
+* **Lag 16 Strategy:** 强制模型回看 16 天前的数据，确保推理阶段数据完整。
+* **Rolling Mean:** 使用滑动窗口平滑单日销量的随机波动（如突发天气影响）。
+
+![Feature Engineering](images/lag_features.png)
+
+```python
+# 必须合并 Train 和 Test 进行时序计算，并按 Store/Family 排序
+all_data = pd.concat([train, test], axis=0).sort_values(['store_nbr', 'family', 'date'])
+
+# --- 策略 A: 滞后特征 (The Rear-View Mirror) ---
+# 为什么是 16? 因为测试集时长为 16 天。
+# 这是防止数据泄露 (Data Leakage) 的最小安全距离。
+lags = [16, 30, 60, 90]
+for lag in lags:
+    all_data[f'lag_{lag}'] = all_data.groupby(['store_nbr', 'family'])['sales'].shift(lag)
+
+# --- 策略 B: 滑动平均 (Trend Capturing) ---
+# 计算 16 天前的过去 30 天平均销量
+all_data['rolling_mean_30'] = all_data.groupby(['store_nbr', 'family'])['sales'] \
+    .transform(lambda x: x.shift(16).rolling(30).mean())
+
+print("✅ 高阶时序特征构建完成 (Lags + Rolling Means)")
